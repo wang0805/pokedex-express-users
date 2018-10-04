@@ -6,7 +6,7 @@ class New extends React.Component {
       <html>
         <head />
         <body>
-          <form method="POST" action="/users">
+          <form method="POST" action="/user">
             <div>
               name:<input name="name" type="text" />
             </div>
