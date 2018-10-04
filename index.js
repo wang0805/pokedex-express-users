@@ -7,7 +7,8 @@
  * 4. (FURTHER) Add a drop-down menu of all users on the pokemon form
  * 5. (FURTHER) Add a types table and a pokemon-types table in your database, and create a seed.sql file inserting relevant data for these 2 tables. Note that a pokemon can have many types, and a type can have many pokemons.
  */
-
+const sha256 = require('js-sha256');
+const cookieParser = require('cookie-parser');
 const express = require('express');
 const methodOverride = require('method-override');
 const pg = require('pg');
@@ -39,9 +40,10 @@ pool.on('error', function (err) {
 // Init express app
 const app = express();
 
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 app.use(methodOverride('_method'));
-
 
 // Set react-views to be the default view engine
 const reactEngine = require('express-react-views').createEngine();
@@ -55,18 +57,44 @@ app.engine('jsx', reactEngine);
  * ===================================
  */
 
+const userLogin = (request, response) => {
+
+  let name = request.body.name;
+
+  const queryString = `SELECT * FROM users WHERE name='${name}'`;
+
+  pool.query(queryString, (err, result) => {
+    if (err) {
+      console.error('Query error:', err.stack);
+    } else if(result.rows[0]!=null){
+        console.log("query result", result.rows);
+        if(sha256(request.body.password) === result.rows[0].password){
+
+          response.cookie('logged_in', 'true');
+          response.cookie('user_id', result.rows[0].id);
+          // redirect to home page
+          let redirectUrl = '/user/'+result.rows[0].id;
+          response.redirect(redirectUrl);
+        } else {response.send("Wrong Password");}
+    }
+    else {response.send("No such user");}
+  });
+}
+
 
 const getUserRoot = (request, response) => {
-  // query database for all pokemon
 
-  // respond with HTML page displaying all pokemon
-  //
+  //clear cookies first
+  response.clearCookie('user_id');
+  response.clearCookie('logged_in');
+
   const queryString = 'SELECT * from users';
+
   pool.query(queryString, (err, result) => {
     if (err) {
       console.error('Query error:', err.stack);
     } else {
-      console.log('Query result:', result.rows);
+      //console.log('Query result:', result.rows);
 
       // redirect to home page
       response.render( 'users/home', {user: result.rows} );
@@ -79,6 +107,12 @@ const getUserRoot = (request, response) => {
 
   // respond with HTML page displaying all pokemon
   //
+  let user_id = null;
+
+  if(request.cookies['user_id']!=undefined){
+    user_id = request.cookies['user_id'];
+  }
+
   const queryString = 'SELECT * from pokemon;';
   pool.query(queryString, (err, result) => {
     if (err) {
@@ -87,7 +121,7 @@ const getUserRoot = (request, response) => {
       //console.log('Query result:', result);
 
       // redirect to home page
-      response.render( 'pokemon/Home', {pokemon: result.rows} );
+      response.render( 'pokemon/Home', {pokemon: result.rows, userid: user_id} );
     }
   });
 }
@@ -115,26 +149,17 @@ const getPokemon = (request, response) => {
   });
 }
 
-// const getUser = (request, response) => {
-//   let id = request.params['id'];
-//   const queryString = 'SELECT * FROM users WHERE id = ' + id + ';';
-//   pool.query(queryString, (err, result) => {
-//     if (err) {
-//       console.error('Query error:', err.stack);
-//     } else {
-//       console.log('Query result:', result);
-
-//       // redirect to home page
-//       response.render( 'users/user', {user: result.rows[0]} );
-//     }
-//   });
-// }
-
 const getUser = (request, response) => {
-  let id = request.params['id'];
+  console.log(request.params);
+  let id = parseInt(request.cookies['user_id']);
   
-  const queryString = 'SELECT users_pokemon.users_id, pokemon.name FROM pokemon INNER JOIN users_pokemon ON (users_pokemon.pokemon_id = pokemon.id) WHERE users_pokemon.users_id='+id+';';
-  
+  //use ` something ` to split the txt
+  const queryString = `SELECT users.name AS trainername, pokemon.name AS pokemonname
+  FROM pokemon 
+  INNER JOIN users_pokemon ON (users_pokemon.pokemon_id = pokemon.id) 
+  INNER JOIN users ON (users_pokemon.users_id = users.id) 
+  WHERE users_pokemon.users_id=${id};`;
+
   pool.query(queryString, (err, result) => {
     if (err) {
       console.error('Query error:', err.stack);
@@ -166,13 +191,16 @@ const postPokemon = (request, response) => {
 };
 
 //how to make this more dynamic for users 
-const catchPokemon1 = (request, response) => {
-  console.log(request.body);
+const catchPokemon = (request, response) => {
+  console.log(request.cookies['user_id'])
+  console.log(typeof request.cookies['user_id']);
 
   let params = request.body.id;
+  let id = parseInt(request.cookies['user_id']);
+
   const queryString = 'INSERT INTO users_pokemon(pokemon_id, users_id) VALUES ($1, $2);';
 
-  let values =[params, 1];
+  let values =[params, id];
 
   pool.query(queryString, values, (err, result) => {
     if (err) {
@@ -188,10 +216,11 @@ const catchPokemon1 = (request, response) => {
 
 const postUser = (request, response) => {
 
-  let params = request.body;
+  let name = request.body.name;
+  let hash = sha256(request.body.password);
   
-  const queryString = 'INSERT INTO users(name) VALUES($1);';
-  const values = [params.name];
+  const queryString = 'INSERT INTO users(name, password) VALUES($1, $2);';
+  const values = [name, hash];
 
   pool.query(queryString, values, (err, result) => {
     if (err) {
@@ -200,7 +229,7 @@ const postUser = (request, response) => {
       //console.log('query result:', result);
 
       // redirect to home page
-      response.redirect('/');
+      response.redirect('/user');
     }
   });
 };
@@ -256,30 +285,6 @@ const userNew = (request, response) => {
   response.render('users/new');
 }
 
-const userCreate = (request, response) => {
-
-  const queryString = 'INSERT INTO users (name) VALUES ($1)';
-
-  const values = [request.body.name];
-
-  console.log(queryString);
-
-  pool.query(queryString, values, (err, result) => {
-
-    if (err) {
-
-      console.error('Query error:', err.stack);
-      response.send('dang it.');
-    } else {
-
-      console.log('Query result:', result);
-
-      // redirect to home page
-      response.redirect('/');
-    }
-  });
-}
-
 /**
  * ===================================
  * Routes
@@ -296,6 +301,7 @@ app.get('/pokemon/:id', getPokemon);
 app.get('/user/:id', getUser);
 app.get('/pokemon/:id/delete', deletePokemonForm);
 
+app.post('/user/login', userLogin);
 app.post('/pokemon', postPokemon);
 app.post('/user', postUser);
 
@@ -306,8 +312,7 @@ app.delete('/pokemon/:id', deletePokemon);
 // TODO: New routes for creating users
 
 app.get('/users/new', userNew);
-app.post('/users', userCreate);
-app.post('/user/1', catchPokemon1);
+app.post('/user/1', catchPokemon);
 
 /**
  * ===================================

@@ -4,11 +4,10 @@ class Home extends React.Component {
   render() {
     //console.log(this);
     let userlist = this.props.user.map(users => {
-      let aTag = '/user/'+users.id;
 
       return (
         <li key={users.id}>
-          <a href={aTag}>{users.name}</a>
+          {users.name}
         </li> 
       )
     })
@@ -19,9 +18,20 @@ class Home extends React.Component {
         <head />
         <body>
           <h1>Welcome to Users</h1>
-          <form method="GET" action='/user/new'>
-            <input type="submit" value="New"/>
+          <form method="POST" action ='/user/login'>
+            <p>Username:</p>
+            <input name="name" type="text" placeholder="enter username"/>
+            <p>Password:</p>
+            <input name="password" type="password" placeholder="enter password"/>
+            <p></p>
+            <input type="submit" value="login"/>
           </form>
+          <p></p>
+          <form method="GET" action='/user/new'>
+            <input type="submit" value="Sign up"/>
+          </form>
+          <p></p>
+          <h2>List of users for reference</h2>
           <ul>
             {userlist}
           </ul>

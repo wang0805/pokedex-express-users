@@ -9,23 +9,28 @@ class Pokemon extends React.Component {
           <div>
             <ul className="pokemon-list">
               <li className="pokemon-attribute">
-                id: {this.props.pokemon.id}
+                Id: {this.props.pokemon.id}
               </li>
               <li className="pokemon-attribute">
-                name: {this.props.pokemon.name}
+                Name: {this.props.pokemon.name}
               </li>
               <li className="pokemon-attribute">
                 <img src={this.props.pokemon.img}/>
               </li>
               <li className="pokemon-attribute">
-                height: {this.props.pokemon.height}
+                Height: {this.props.pokemon.height}
               </li>
               <li className="pokemon-attribute">
-                weight: {this.props.pokemon.weight}
+                Weight: {this.props.pokemon.weight}
               </li>
+              <p/>
               <form method="POST" action='/user/1'>
                 <input name='id' value={this.props.pokemon.id} type="hidden"/>
-                <input type="submit" value="user 1 catch pokemon"/>
+                <input type="submit" value="Catch pokemon"/>
+              </form>
+              <p/>
+              <form method="GET" action='/pokemon'>
+                <input type="submit" value="Back"/>
               </form>
             </ul>
           </div>
