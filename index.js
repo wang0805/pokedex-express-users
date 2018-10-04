@@ -57,215 +57,11 @@ app.engine('jsx', reactEngine);
  * ===================================
  */
 
-const userLogin = (request, response) => {
-
-  let name = request.body.name;
-
-  const queryString = `SELECT * FROM users WHERE name='${name}'`;
-
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else if(result.rows[0]!=null){
-        console.log("query result", result.rows);
-        if(sha256(request.body.password) === result.rows[0].password){
-
-          response.cookie('logged_in', 'true');
-          response.cookie('user_id', result.rows[0].id);
-          // redirect to home page
-          let redirectUrl = '/user/'+result.rows[0].id;
-          response.redirect(redirectUrl);
-        } else {response.send("Wrong Password");}
-    }
-    else {response.send("No such user");}
-  });
-}
-
-
-const getUserRoot = (request, response) => {
-
-  //clear cookies first
-  response.clearCookie('user_id');
-  response.clearCookie('logged_in');
-
-  const queryString = 'SELECT * from users';
-
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-      //console.log('Query result:', result.rows);
-
-      // redirect to home page
-      response.render( 'users/home', {user: result.rows} );
-    }
-  });
-}
-
- const getRoot = (request, response) => {
-  // query database for all pokemon
-
-  // respond with HTML page displaying all pokemon
-  //
-  let user_id = null;
-
-  if(request.cookies['user_id']!=undefined){
-    user_id = request.cookies['user_id'];
-  }
-
-  const queryString = 'SELECT * from pokemon;';
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-      //console.log('Query result:', result);
-
-      // redirect to home page
-      response.render( 'pokemon/Home', {pokemon: result.rows, userid: user_id} );
-    }
-  });
-}
-
-const getNew = (request, response) => {
-  response.render('pokemon/new');
-}
-
-const getNewUser = (request, response) => {
-  response.render('users/new');
-}
-
-const getPokemon = (request, response) => {
-  let id = request.params['id'];
-  const queryString = 'SELECT * FROM pokemon WHERE id = ' + id + ';';
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-     //console.log('Query result:', result.rows);
-
-      // redirect to home page
-      response.render( 'pokemon/Pokemon', {pokemon: result.rows[0]} );
-    }
-  });
-}
-
-const getUser = (request, response) => {
-  console.log(request.params);
-  let id = parseInt(request.cookies['user_id']);
-  
-  //use ` something ` to split the txt
-  const queryString = `SELECT users.name AS trainername, pokemon.name AS pokemonname
-  FROM pokemon 
-  INNER JOIN users_pokemon ON (users_pokemon.pokemon_id = pokemon.id) 
-  INNER JOIN users ON (users_pokemon.users_id = users.id) 
-  WHERE users_pokemon.users_id=${id};`;
-
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-      console.log('Query result:', result.rows);
-
-      // redirect to home page
-      response.render( 'users/user', {user: result.rows} );
-    }
-  });
-}
-
-const postPokemon = (request, response) => {
-  let params = request.body;
-  
-  const queryString = 'INSERT INTO pokemon(name, img, weight, height) VALUES($1, $2, $3, $4);';
-  const values = [params.name, params.img, params.weight, params.height];
-
-  pool.query(queryString, values, (err, result) => {
-    if (err) {
-      console.log('query error:', err.stack);
-    } else {
-      //console.log('query result:', result);
-
-      // redirect to home page
-      response.redirect('/');
-    }
-  });
-};
+var routing = require('./routes');
+//init
+routing(app, pool);
 
 //how to make this more dynamic for users 
-const catchPokemon = (request, response) => {
-  console.log(request.cookies['user_id'])
-  console.log(typeof request.cookies['user_id']);
-
-  let params = request.body.id;
-  let id = parseInt(request.cookies['user_id']);
-
-  const queryString = 'INSERT INTO users_pokemon(pokemon_id, users_id) VALUES ($1, $2);';
-
-  let values =[params, id];
-
-  pool.query(queryString, values, (err, result) => {
-    if (err) {
-      console.log('query error:', err.stack);
-    } else {
-      //console.log('query result:', result);
-
-      // redirect to home page
-      response.redirect('/user/1');
-    }
-  });
-}
-
-const postUser = (request, response) => {
-
-  let name = request.body.name;
-  let hash = sha256(request.body.password);
-  
-  const queryString = 'INSERT INTO users(name, password) VALUES($1, $2);';
-  const values = [name, hash];
-
-  pool.query(queryString, values, (err, result) => {
-    if (err) {
-      console.log('query error:', err.stack);
-    } else {
-      //console.log('query result:', result);
-
-      // redirect to home page
-      response.redirect('/user');
-    }
-  });
-};
-
-const editPokemonForm = (request, response) => {
-  let id = request.params['id'];
-  const queryString = 'SELECT * FROM pokemon WHERE id = ' + id + ';';
-  pool.query(queryString, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-      console.log('Query result:', result);
-
-      // redirect to home page
-      response.render( 'pokemon/Edit', {pokemon: result.rows[0]} );
-    }
-  });
-}
-
-const updatePokemon = (request, response) => {
-  let id = request.params['id'];
-  let pokemon = request.body;
-  const queryString = 'UPDATE "pokemon" SET "num"=($1), "name"=($2), "img"=($3), "height"=($4), "weight"=($5) WHERE "id"=($6)';
-  const values = [pokemon.num, pokemon.name, pokemon.img, pokemon.height, pokemon.weight, id];
-  console.log(queryString);
-  pool.query(queryString, values, (err, result) => {
-    if (err) {
-      console.error('Query error:', err.stack);
-    } else {
-      console.log('Query result:', result);
-
-      // redirect to home page
-      response.redirect('/');
-    }
-  });
-}
 
 const deletePokemonForm = (request, response) => {
   response.send("COMPLETE ME");
@@ -280,39 +76,17 @@ const deletePokemon = (request, response) => {
  * ===================================
  */
 
-
-const userNew = (request, response) => {
-  response.render('users/new');
-}
-
 /**
  * ===================================
  * Routes
  * ===================================
  */
 
-app.get('/pokemon', getRoot);
-app.get('/user', getUserRoot);
-
-app.get('/pokemon/:id/edit', editPokemonForm);
-app.get('/pokemon/new', getNew);
-app.get('/user/new', getNewUser);
-app.get('/pokemon/:id', getPokemon);
-app.get('/user/:id', getUser);
 app.get('/pokemon/:id/delete', deletePokemonForm);
 
-app.post('/user/login', userLogin);
-app.post('/pokemon', postPokemon);
-app.post('/user', postUser);
-
-app.put('/pokemon/:id', updatePokemon);
 
 app.delete('/pokemon/:id', deletePokemon);
 
-// TODO: New routes for creating users
-
-app.get('/users/new', userNew);
-app.post('/user/1', catchPokemon);
 
 /**
  * ===================================
